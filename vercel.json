@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm ci --prefix frontend && npm install --omit=dev",
-  "buildCommand": "cd frontend && npm run build"
+  "installCommand": "if [ -f next.config.mjs ]; then npm ci; else cd frontend && npm ci; fi",
+  "buildCommand": "if [ -f next.config.mjs ]; then npm run build; else cd frontend && npm run build; fi"
 }
