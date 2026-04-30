@@ -9,6 +9,7 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build": "npm run build --prefix frontend",
+    "vercel-build": "cd frontend && npm run build",
     "lint": "npm --prefix frontend run lint",
     "test": "echo \"No root tests configured\" && exit 0"
   },
