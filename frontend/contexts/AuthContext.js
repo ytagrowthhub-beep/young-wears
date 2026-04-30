@@ -14,9 +14,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem("yw_token");
-    if (!token) {
-      return;
-    }
+    if (!token) return;
     setAuthToken(token);
     api
       .get("/profile")
@@ -42,6 +40,13 @@ export function AuthProvider({ children }) {
     setUser(res.data.user);
   };
 
+  const completeSocialLogin = async (payload) => {
+    const res = await api.post("/auth/google/supabase", payload);
+    localStorage.setItem("yw_token", res.data.token);
+    setAuthToken(res.data.token);
+    setUser(res.data.user);
+  };
+
   const logout = () => {
     localStorage.removeItem("yw_token");
     setAuthToken(null);
@@ -58,7 +63,7 @@ export function AuthProvider({ children }) {
     logout();
   };
 
-  const value = { user, loading, register, login, logout, updateProfile, deleteProfile };
+  const value = { user, loading, register, login, completeSocialLogin, logout, updateProfile, deleteProfile };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -46,6 +46,17 @@ const productSchema = new mongoose.Schema(
 const User = mongoose.model("User", userSchema);
 const Product = mongoose.model("Product", productSchema);
 
+function sanitizeUser(user) {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    profilePicture: user.profilePicture,
+  };
+}
+
 const childClothes = [
   ["Mini Motion Tee", 24.99, ["4Y", "6Y", "8Y", "10Y"], "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?q=80&w=1200"],
   ["Tiny Trail Hoodie", 29.99, ["4Y", "6Y", "8Y", "10Y"], "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?q=80&w=1200"],
@@ -163,14 +174,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     return res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        profilePicture: user.profilePicture,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     return res.status(500).json({ message: "Registration failed." });
@@ -189,17 +193,70 @@ app.post("/api/auth/login", async (req, res) => {
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
     return res.json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        profilePicture: user.profilePicture,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     return res.status(500).json({ message: "Login failed." });
+  }
+});
+
+app.post("/api/auth/google/supabase", async (req, res) => {
+  try {
+    const { accessToken, email, name, avatarUrl, providerUserId } = req.body || {};
+    if (!accessToken || !email) {
+      return res.status(400).json({ message: "accessToken and email are required." });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabasePublicKey =
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabasePublicKey) {
+      return res.status(500).json({ message: "Supabase auth environment variables are missing." });
+    }
+
+    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabasePublicKey,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({ message: "Invalid Supabase access token." });
+    }
+
+    const verifiedUser = await userResponse.json();
+    const verifiedEmail = String(verifiedUser?.email || "").toLowerCase();
+    if (!verifiedEmail || verifiedEmail !== String(email).toLowerCase()) {
+      return res.status(401).json({ message: "Google account verification mismatch." });
+    }
+
+    let user = await User.findOne({ email: verifiedEmail });
+    if (!user) {
+      const generatedPassword = await bcrypt.hash(`google_${providerUserId || verifiedUser.id}_${Date.now()}`, 10);
+      user = await User.create({
+        name: name || verifiedUser.user_metadata?.full_name || verifiedEmail.split("@")[0],
+        email: verifiedEmail,
+        password: generatedPassword,
+        profilePicture: avatarUrl || verifiedUser.user_metadata?.avatar_url || "",
+      });
+    } else {
+      const updates = {};
+      if (name && user.name !== name) updates.name = name;
+      if (avatarUrl && user.profilePicture !== avatarUrl) updates.profilePicture = avatarUrl;
+      if (Object.keys(updates).length) {
+        user = await User.findByIdAndUpdate(user._id, updates, { new: true });
+      }
+    }
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
+    return res.json({ token, user: sanitizeUser(user) });
+  } catch (_error) {
+    return res.status(500).json({ message: "Google login failed." });
   }
 });
 

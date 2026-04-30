@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import { api } from "@/lib/api";
 import { sampleProducts } from "@/lib/sampleProducts";
 import { useCart } from "@/contexts/CartContext";
 
 export default function ProductDetails({ params }) {
-  const { id } = params;
+  const { id } = use(params);
   const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
   const [size, setSize] = useState("");
