@@ -2,9 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 import ProductCard from "@/components/ProductCard";
 import { sampleProducts } from "@/lib/sampleProducts";
-import HeroSlider from "@/components/HeroSlider";
-import DealCountdown from "@/components/DealCountdown";
+import DigitalProductCountdown from "@/components/DigitalProductCountdown";
+import HomeHero from "@/components/HomeHero";
+import HomeProductCarousel from "@/components/HomeProductCarousel";
 import HomePersonalizedSections from "@/components/HomePersonalizedSections";
+import { categoryDisplayOrder, categoryMeta } from "@/lib/categories";
 
 async function getProducts() {
   try {
@@ -24,38 +26,16 @@ export default async function Home() {
   const spotlight = products[4] || products[0];
   const spotlightTwo = products[8] || products[1];
   const spotlightThree = products[12] || products[2];
-  const categoryCounts = ["Child Clothes", "Adult Clothes", "Women Clothes", "Other Wears"].map((title) => ({
+  const categoryCounts = categoryDisplayOrder.map((title) => ({
     title,
-    href: `/categories/${title.toLowerCase().replace(/\s+/g, "-")}`,
+    href: `/categories/${categoryMeta[title].slug}`,
     count: products.filter((item) => item.category === title).length,
   }));
   return (
     <div>
-      <section className="yw-gradient text-white">
-        <div className="mx-auto grid max-w-7xl items-center gap-8 px-6 py-20 md:grid-cols-2">
-          <div>
-            <p className="mb-3 inline-block rounded-full bg-white/20 px-3 py-1 text-sm">Style for Every Generation</p>
-            <h1 className="text-4xl font-bold leading-tight md:text-5xl">
-              Welcome to Young Wears - Fashion for All Ages
-            </h1>
-            <p className="mt-4 max-w-lg text-slate-100">
-              Stylish and affordable essentials for kids and adults with a premium look and everyday comfort.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/shop" className="rounded-full bg-[#FF7A00] px-6 py-3 font-semibold transition hover:scale-105">
-                Shop Now
-              </Link>
-              <Link href="/shop" className="rounded-full border border-white/60 px-6 py-3 font-semibold hover:bg-white/10">
-                Explore Collection
-              </Link>
-            </div>
-            <div className="mt-6">
-              <DealCountdown durationHours={24} />
-            </div>
-          </div>
-          <HeroSlider />
-        </div>
-      </section>
+      <div className="bg-slate-100 px-4 pb-2 pt-6 sm:px-6 sm:pt-8">
+        <HomeHero products={products} />
+      </div>
 
       <section className="mx-auto max-w-7xl px-6 py-14">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -88,6 +68,8 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      <HomeProductCarousel products={products} />
 
       {spotlight && (
         <section className="mx-auto max-w-7xl px-6 pb-14">
@@ -123,8 +105,8 @@ export default async function Home() {
                   <li>- Best value in current weekly deal</li>
                   <li>- Available in multiple sizes for family matching</li>
                 </ul>
-                <div className="mt-5">
-                  <DealCountdown durationHours={12} />
+                <div className="mt-5 max-w-xs">
+                  <DigitalProductCountdown durationHours={26} label="Spotlight price ends" size="sm" variant="light" />
                 </div>
               </div>
             </div>
@@ -170,8 +152,8 @@ export default async function Home() {
                 <li>- Easy to pair with wardrobe staples</li>
                 <li>- High demand item in this week&apos;s collection</li>
               </ul>
-              <div className="mt-5">
-                <DealCountdown durationHours={10} />
+              <div className="mt-5 max-w-xs">
+                <DigitalProductCountdown durationHours={34} label="Feature offer ends" size="sm" variant="light" />
               </div>
             </div>
           </div>
@@ -198,9 +180,12 @@ export default async function Home() {
                 <h3 className="mt-2 text-3xl font-bold text-[#0A1F44]">{spotlightThree.name}</h3>
                 <p className="mt-3 text-slate-600">{spotlightThree.description}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Limited-time price</p>
-                <p className="mt-1 text-2xl font-bold text-[#0A1F44]">${spotlightThree.price.toFixed(2)}</p>
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:min-w-[200px]">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Limited-time price</p>
+                  <p className="mt-1 text-2xl font-bold text-[#0A1F44]">${spotlightThree.price.toFixed(2)}</p>
+                </div>
+                <DigitalProductCountdown durationHours={41} label="Drop ends" size="sm" variant="light" />
               </div>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">

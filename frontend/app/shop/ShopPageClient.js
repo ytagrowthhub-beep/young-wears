@@ -8,18 +8,32 @@ import ProductCard from "@/components/ProductCard";
 import LoadingGrid from "@/components/LoadingGrid";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import DealCountdown from "@/components/DealCountdown";
+import { categoryDisplayOrder } from "@/lib/categories";
+import { enrichProductForShop } from "@/lib/shopFacets";
 
-const CATEGORY_ORDER = ["Women Clothes", "Adult Clothes", "Child Clothes", "Other Wears"];
+const CATEGORY_ORDER = categoryDisplayOrder;
 const PAGE_SIZE = 12;
+const PRICE_MIN = 0;
+const PRICE_MAX = 500;
 
 function parseFilters(searchParams) {
+  const maxRaw = searchParams.get("maxPrice");
+  let maxPrice = PRICE_MAX;
+  if (maxRaw !== null && maxRaw !== "") {
+    const n = Number(maxRaw);
+    if (Number.isFinite(n)) maxPrice = Math.min(PRICE_MAX, Math.max(PRICE_MIN, n));
+  }
+
   return {
     sort: searchParams.get("sort") || "featured",
     category: searchParams.get("category") || "",
     size: searchParams.get("size") || "",
     q: searchParams.get("q") || "",
-    maxPrice: Math.min(200, Math.max(20, Number(searchParams.get("maxPrice")) || 200)),
-    feature: searchParams.get("feature") || "",
+    maxPrice,
+    ptype: searchParams.get("ptype") || "",
+    gender: searchParams.get("gender") || "",
+    color: searchParams.get("color") || "",
+    feat: searchParams.get("feat") || searchParams.get("feature") || "",
   };
 }
 
@@ -31,12 +45,16 @@ function buildShopQuery(searchParams, patch) {
     category: merged.category,
     size: merged.size,
     q: merged.q,
-    maxPrice: merged.maxPrice === 200 ? "" : String(merged.maxPrice),
-    feature: merged.feature,
+    maxPrice: merged.maxPrice >= PRICE_MAX ? "" : String(merged.maxPrice),
+    ptype: merged.ptype,
+    gender: merged.gender,
+    color: merged.color,
+    feat: merged.feat,
   }).forEach(([key, val]) => {
     if (val === "" || val == null) next.delete(key);
     else next.set(key, String(val));
   });
+  next.delete("feature");
   const qs = next.toString();
   return qs ? `/shop?${qs}` : "/shop";
 }
@@ -58,11 +76,19 @@ function sizesFromCatalog(products) {
   return [...new Set(base.flatMap((item) => item.sizes || []))].sort();
 }
 
-function sortCatalogProducts(products, search, sortBy, feature) {
-  let list = products.filter((p) => {
-    const target = `${p.name} ${p.description}`.toLowerCase();
-    if (!target.includes(search.toLowerCase())) return false;
-    if (feature && !target.includes(feature.toLowerCase())) return false;
+function filterAndSortCatalog(enrichedProducts, filters) {
+  const { sort: sortBy, category, size, q: search, maxPrice, ptype, gender, color, feat } = filters;
+
+  let list = enrichedProducts.filter((p) => {
+    if (category && p.category !== category) return false;
+    if (size && !(p.sizes || []).includes(size)) return false;
+    if (typeof p.price === "number" && p.price > maxPrice) return false;
+    const blob = `${p.name} ${p.description}`.toLowerCase();
+    if (search && !blob.includes(search.toLowerCase().trim())) return false;
+    if (ptype && p.shopProductType !== ptype) return false;
+    if (gender && p.shopGender !== gender) return false;
+    if (color && !(p.shopColors || []).includes(color)) return false;
+    if (feat && !(p.shopFeatures || []).includes(feat)) return false;
     return true;
   });
 
@@ -86,18 +112,22 @@ function sortCatalogProducts(products, search, sortBy, feature) {
 const FILTER_SECTIONS = [
   {
     title: "Product Type",
+    param: "ptype",
     options: ["T-Shirts & Tops", "Shorts", "Leggings", "Jackets", "Accessories"],
   },
   {
     title: "Gender",
+    param: "gender",
     options: ["Women", "Men", "Unisex", "Kids"],
   },
   {
     title: "Features",
+    param: "feat",
     options: ["Breathable", "Lightweight", "Seamless", "Pockets"],
   },
   {
     title: "Color",
+    param: "color",
     options: ["Black", "Blue", "White", "Green", "Pink", "Grey"],
   },
 ];
@@ -106,36 +136,25 @@ const POPULAR_TAGS = [
   { label: "Women's picks", patch: { category: "Women Clothes" } },
   { label: "Men's essentials", patch: { category: "Adult Clothes" } },
   { label: "Kids", patch: { category: "Child Clothes" } },
+  { label: "Activewear", patch: { category: "Activewear & Gym" } },
+  { label: "Sneakers", patch: { category: "Footwear & Sneakers" } },
   { label: "Accessories", patch: { category: "Other Wears" } },
 ];
 
-function FetchedProducts({ category, size, maxPrice, children }) {
+function FetchedProducts({ children }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    const params = {};
-    if (category) params.category = category;
-    if (size) params.size = size;
-    params.maxPrice = maxPrice;
 
     api
-      .get("/products", { params })
+      .get("/products")
       .then((res) => {
         if (!cancelled) setProducts(res.data);
       })
       .catch(() => {
-        if (!cancelled) {
-          setProducts(
-            sampleProducts.filter(
-              (p) =>
-                (!category || p.category === category) &&
-                (!size || p.sizes.includes(size)) &&
-                p.price <= maxPrice
-            )
-          );
-        }
+        if (!cancelled) setProducts(sampleProducts);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -144,7 +163,7 @@ function FetchedProducts({ category, size, maxPrice, children }) {
     return () => {
       cancelled = true;
     };
-  }, [category, size, maxPrice]);
+  }, []);
 
   return children({ products, loading });
 }
@@ -228,18 +247,29 @@ function ShopPageLayout({
   setMobileFiltersOpen,
   filterGridKey,
 }) {
-  const { sort: sortBy, category, size, q: search, maxPrice, feature } = filters;
+  const { sort: sortBy, category, size, q: search, maxPrice, ptype, gender, color, feat } = filters;
+
+  const enrichedAll = useMemo(() => products.map(enrichProductForShop), [products]);
 
   const sizes = useMemo(() => sizesFromCatalog(products), [products]);
 
   const sortedProducts = useMemo(
-    () => sortCatalogProducts(products, search, sortBy, feature),
-    [products, search, sortBy, feature]
+    () => filterAndSortCatalog(enrichedAll, filters),
+    [enrichedAll, filters]
   );
 
   const resetFilters = useCallback(() => {
     router.replace("/shop", { scroll: false });
   }, [router]);
+
+  const facetButtonClass = (active) =>
+    `rounded-full border px-2.5 py-1 text-xs ${
+      active ? "border-[#0A1F44] bg-[#0A1F44] text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+    }`;
+
+  const toggleFacet = (param, option, current) => {
+    pushFilters({ [param]: current === option ? "" : option });
+  };
 
   const sidebarFilters = (
     <>
@@ -270,10 +300,11 @@ function ShopPageLayout({
           onChange={(e) => pushFilters({ category: e.target.value })}
         >
           <option value="">All Categories</option>
-          <option value="Child Clothes">Child Clothes</option>
-          <option value="Adult Clothes">Adult Clothes</option>
-          <option value="Women Clothes">Women Clothes</option>
-          <option value="Other Wears">Other Wears</option>
+          {categoryDisplayOrder.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
       </FacetGroup>
 
@@ -294,11 +325,13 @@ function ShopPageLayout({
 
       <FacetGroup title="Price">
         <div className="rounded-lg border border-slate-200 px-3 py-2">
-          <label className="text-xs text-slate-500">Max Price: ${maxPrice}</label>
+          <label className="text-xs text-slate-500">
+            Max price: ${maxPrice} <span className="text-slate-400">(0 – ${PRICE_MAX})</span>
+          </label>
           <input
             type="range"
-            min="20"
-            max="200"
+            min={PRICE_MIN}
+            max={PRICE_MAX}
             step="5"
             value={maxPrice}
             onChange={(e) => pushFilters({ maxPrice: Number(e.target.value) })}
@@ -310,18 +343,19 @@ function ShopPageLayout({
       {FILTER_SECTIONS.map((section) => (
         <FacetGroup key={section.title} title={section.title}>
           <div className="flex flex-wrap gap-1.5">
-            {section.options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  feature === option ? "border-[#0A1F44] bg-[#0A1F44] text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-                onClick={() => pushFilters({ feature: feature === option ? "" : option })}
-              >
-                {option}
-              </button>
-            ))}
+            {section.options.map((option) => {
+              const current = filters[section.param];
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={facetButtonClass(current === option)}
+                  onClick={() => toggleFacet(section.param, option, current)}
+                >
+                  {option}
+                </button>
+              );
+            })}
           </div>
         </FacetGroup>
       ))}
@@ -427,11 +461,9 @@ function ShopPageLayout({
 export default function ShopPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
+  const filters = useMemo(() => parseFilters(searchParams), [searchParams.toString()]);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  const { sort: sortBy, category, size, q: search, maxPrice, feature } = filters;
 
   const pushFilters = useCallback(
     (patch) => {
@@ -440,11 +472,12 @@ export default function ShopPageClient() {
     [router, searchParams]
   );
 
-  const catalogFetchKey = `${category}|${size}|${maxPrice}`;
-  const filterGridKey = `${category}|${size}|${search}|${maxPrice}|${sortBy}|${feature}`;
+  const { sort: sortBy, category, size, q: search, maxPrice, ptype, gender, color, feat } = filters;
+
+  const filterGridKey = `${category}|${size}|${search}|${maxPrice}|${sortBy}|${ptype}|${gender}|${color}|${feat}`;
 
   return (
-    <FetchedProducts key={catalogFetchKey} category={category} size={size} maxPrice={maxPrice}>
+    <FetchedProducts>
       {({ products, loading }) => (
         <ShopPageLayout
           products={products}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { getSiteUrl, getSupabaseClient } from "@/lib/supabaseClient";
+import { getSiteUrl, getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
 
     async function finish() {
       try {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseBrowserClient();
         const params = new URLSearchParams(window.location.search);
         const code = params.get("code");
         if (code) {
@@ -43,7 +43,7 @@ export default function AuthCallbackPage() {
         await supabase.auth.signOut();
         if (active) router.replace("/profile");
       } catch (err) {
-        const msg = String(err?.message || "");
+        const msg = String(err?.response?.data?.message || err?.message || "");
         if (active) {
           if (msg.toLowerCase().includes("provider is not enabled")) {
             setError("Google provider is disabled in Supabase Auth settings.");

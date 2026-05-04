@@ -60,7 +60,7 @@ export default function ProfilePage() {
           <button disabled={saving} className="rounded-lg bg-[#0A1F44] px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70">
             {saving ? "Saving..." : "Save Changes"}
           </button>
-          <button type="button" onClick={logout} className="rounded-lg border border-slate-300 px-5 py-3">Logout</button>
+          <button type="button" onClick={logout} className="rounded-lg border border-slate-300 px-5 py-3">Sign out of Young Wears</button>
           <button type="button" disabled={deleting} onClick={handleDelete} className="rounded-lg bg-red-500 px-5 py-3 text-white disabled:cursor-not-allowed disabled:opacity-70">
             {deleting ? "Deleting..." : "Delete Account"}
           </button>

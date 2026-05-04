@@ -27,7 +27,33 @@ export const categoryMeta = {
     heroImage:
       "https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1400",
   },
+  "Activewear & Gym": {
+    slug: "activewear-gym",
+    title: "Activewear & Gym",
+    description: "Performance layers, breathable fabrics, and gym-ready silhouettes with everyday polish.",
+    heroImage:
+      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1400",
+  },
+  "Footwear & Sneakers": {
+    slug: "footwear-sneakers",
+    title: "Footwear & Sneakers",
+    description: "Sneakers, slides, and street-ready pairs built for long days and bold moves.",
+    heroImage:
+      "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=80&w=1400",
+  },
 };
+
+/** Display order for nav, shop, and home — keys match product `category` in the API. */
+export const categoryTitles = Object.keys(categoryMeta);
+
+export const categoryDisplayOrder = [
+  "Women Clothes",
+  "Adult Clothes",
+  "Child Clothes",
+  "Activewear & Gym",
+  "Footwear & Sneakers",
+  "Other Wears",
+];
 
 export const categories = Object.values(categoryMeta);
 

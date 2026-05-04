@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { getSiteUrl, getSupabaseClient } from "@/lib/supabaseClient";
+import { getSiteUrl, getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -21,8 +21,8 @@ export default function LoginPage() {
     try {
       await login(form);
       router.push("/profile");
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Invalid email or password.");
     } finally {
       setSubmitting(false);
     }
@@ -32,7 +32,7 @@ export default function LoginPage() {
     setError("");
     setGoogleBusy(true);
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseBrowserClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -54,6 +54,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md px-6 py-14">
       <h1 className="text-3xl font-bold text-[#0A1F44]">Login</h1>
+      <p className="mt-2 text-sm text-slate-500">Sign in to continue to Young Wears.</p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4 rounded-2xl bg-white p-6 shadow-sm">
         <input className="w-full rounded-lg border border-slate-200 px-3 py-3" placeholder="Email" type="email" required value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
         <input className="w-full rounded-lg border border-slate-200 px-3 py-3" placeholder="Password" type="password" required value={form.password} onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} />
@@ -67,7 +68,7 @@ export default function LoginPage() {
           disabled={googleBusy}
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {googleBusy ? "Redirecting..." : "Continue with Google"}
+          {googleBusy ? "Redirecting to Young Wears..." : "Sign in to Young Wears with Google"}
         </button>
       </form>
       <p className="mt-4 text-sm text-slate-500">
