@@ -63,22 +63,31 @@ export default function DigitalProductCountdown({
   size = "md",
   variant = "dark",
 }) {
-  const [endAt] = useState(() => Date.now() + durationHours * 60 * 60 * 1000);
-  const [now, setNow] = useState(() => Date.now());
+  /** Avoid Date.now() during SSR / first paint — it mismatches the client and breaks hydration. */
+  const [ready, setReady] = useState(false);
+  const [endAt, setEndAt] = useState(null);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
+    const end = Date.now() + durationHours * 60 * 60 * 1000;
+    setEndAt(end);
+    setNow(Date.now());
+    setReady(true);
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [durationHours]);
 
   const { hours, minutes, seconds } = useMemo(() => {
+    if (!ready || endAt == null) {
+      return { hours: 0, minutes: 0, seconds: 0 };
+    }
     const remaining = Math.max(endAt - now, 0);
     const totalSeconds = Math.floor(remaining / 1000);
     const hoursPart = Math.floor(totalSeconds / 3600);
     const minutesPart = Math.floor((totalSeconds % 3600) / 60);
     const secondsPart = totalSeconds % 60;
     return { hours: hoursPart, minutes: minutesPart, seconds: secondsPart };
-  }, [endAt, now]);
+  }, [ready, endAt, now]);
 
   const wrap =
     variant === "light"
