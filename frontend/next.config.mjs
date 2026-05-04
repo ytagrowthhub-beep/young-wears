@@ -15,21 +15,34 @@ function trimEnv(value) {
   return value.trim();
 }
 
-const supabaseProjectRef = trimEnv(combinedEnv.NEXT_PUBLIC_SUPABASE_PROJECT_REF);
-const supabaseUrlExplicit = trimEnv(combinedEnv.NEXT_PUBLIC_SUPABASE_URL);
+/** Prefer OS env (e.g. Vercel dashboard) — loadEnvConfig in production often skips .env.local. */
+function mergeEnv(fileVal, osVal) {
+  const f = trimEnv(fileVal);
+  if (f) return f;
+  return trimEnv(osVal);
+}
+
+const supabaseProjectRef = mergeEnv(
+  combinedEnv.NEXT_PUBLIC_SUPABASE_PROJECT_REF,
+  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_REF
+);
+const supabaseUrlExplicit = mergeEnv(combinedEnv.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL);
 const resolvedSupabaseUrl =
   supabaseUrlExplicit ||
   (supabaseProjectRef ? `https://${supabaseProjectRef}.supabase.co` : "");
 
+const publishableOrAnon = mergeEnv(
+  combinedEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || combinedEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 const publicEnv = {
   NEXT_PUBLIC_SUPABASE_PROJECT_REF: supabaseProjectRef,
   NEXT_PUBLIC_SUPABASE_URL: resolvedSupabaseUrl,
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: trimEnv(
-    combinedEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || combinedEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: trimEnv(combinedEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  NEXT_PUBLIC_API_URL: trimEnv(combinedEnv.NEXT_PUBLIC_API_URL),
-  NEXT_PUBLIC_SITE_URL: trimEnv(combinedEnv.NEXT_PUBLIC_SITE_URL),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableOrAnon,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: mergeEnv(combinedEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  NEXT_PUBLIC_API_URL: mergeEnv(combinedEnv.NEXT_PUBLIC_API_URL, process.env.NEXT_PUBLIC_API_URL),
+  NEXT_PUBLIC_SITE_URL: mergeEnv(combinedEnv.NEXT_PUBLIC_SITE_URL, process.env.NEXT_PUBLIC_SITE_URL),
 };
 
 /** @type {import('next').NextConfig} */

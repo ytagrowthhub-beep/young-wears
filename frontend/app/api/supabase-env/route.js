@@ -22,7 +22,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error:
-          "Supabase is not configured on the server. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY) to frontend/.env.local, restart dev, or add them in Vercel → Settings → Environment Variables and redeploy.",
+          "Supabase env vars are missing on this deployment. Add NEXT_PUBLIC_SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_PROJECT_REF) plus NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel → Project → Settings → Environment Variables, enable them for Production (and Preview if needed), then Redeploy. Local dev: use frontend/.env.local.",
       },
       { status: 503 }
     );
