@@ -7,7 +7,7 @@ import Link from "next/link";
 import { getSiteUrl, getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, authConfigError } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -22,7 +22,7 @@ export default function LoginPage() {
       await login(form);
       router.push("/profile");
     } catch (err) {
-      setError(err?.response?.data?.message || "Invalid email or password.");
+      setError(err?.message || "Invalid email or password.");
     } finally {
       setSubmitting(false);
     }
@@ -55,6 +55,12 @@ export default function LoginPage() {
     <div className="mx-auto max-w-md px-6 py-14">
       <h1 className="text-3xl font-bold text-[#0A1F44]">Login</h1>
       <p className="mt-2 text-sm text-slate-500">Sign in to continue to Young Wears.</p>
+      {authConfigError && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
+          <p className="font-medium">Sign-in is not configured correctly</p>
+          <p className="mt-1 text-amber-900/90">{authConfigError}</p>
+        </div>
+      )}
       <form onSubmit={onSubmit} className="mt-6 space-y-4 rounded-2xl bg-white p-6 shadow-sm">
         <input className="w-full rounded-lg border border-slate-200 px-3 py-3" placeholder="Email" type="email" required value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
         <input className="w-full rounded-lg border border-slate-200 px-3 py-3" placeholder="Password" type="password" required value={form.password} onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} />

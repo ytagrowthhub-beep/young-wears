@@ -1,72 +1,22 @@
+const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, ".env") });
+dotenv.config({ path: path.join(__dirname, ".env.local"), override: true });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || "young_wears_secret";
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/young_wears";
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "2mb" }));
-
-const userSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    authProvider: { type: String, enum: ["password", "google"], default: "password" },
-    oauthProviderId: { type: String, default: "" },
-    phone: { type: String, default: "" },
-    address: { type: String, default: "" },
-    profilePicture: { type: String, default: "" },
-  },
-  { timestamps: true }
-);
-
-const productSchema = new mongoose.Schema(
-  {
-    name: String,
-    category: String,
-    audience: String,
-    price: Number,
-    sizes: [String],
-    image: String,
-    description: String,
-    trending: Boolean,
-    stock: Number,
-    isNew: Boolean,
-    source: { type: String, enum: ["seed", "shopify", "aliexpress"], default: "seed" },
-    productUrl: { type: String },
-    externalId: { type: String, sparse: true, unique: true },
-    facets: {
-      productType: { type: String, default: "" },
-      gender: { type: String, default: "" },
-      colors: { type: [String], default: undefined },
-      features: { type: [String], default: undefined },
-    },
-  },
-  { timestamps: true, suppressReservedKeysWarning: true }
-);
-
-const User = mongoose.model("User", userSchema);
-const Product = mongoose.model("Product", productSchema);
-
-function sanitizeUser(user) {
-  return {
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    address: user.address,
-    profilePicture: user.profilePicture,
-  };
-}
 
 const childClothes = [
   ["Mini Motion Tee", 24.99, ["4Y", "6Y", "8Y", "10Y"], "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?q=80&w=1200"],
@@ -516,211 +466,70 @@ function buildProductTypeGridProducts() {
 
 const productTypeGridProducts = buildProductTypeGridProducts();
 
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
+function syntheticId(seed) {
+  return crypto.createHash("sha256").update(String(seed)).digest("hex").slice(0, 24);
+}
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId;
-    return next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
+function buildMemoryCatalog() {
+  const facetMap = new Map();
+  for (const doc of facetShowcaseProducts) {
+    facetMap.set(doc.externalId, {
+      ...doc,
+      _id: syntheticId(`ext:${doc.externalId}`),
+      createdAt: new Date(),
+    });
   }
-};
+  for (const doc of productTypeGridProducts) {
+    facetMap.set(doc.externalId, {
+      ...doc,
+      _id: syntheticId(`ext:${doc.externalId}`),
+      createdAt: new Date(),
+    });
+  }
+  const samples = sampleProducts.map((p, i) => ({
+    ...p,
+    _id: syntheticId(`sample:${p.category}:${p.name}:${i}`),
+    createdAt: new Date(),
+  }));
+  return [...samples, ...facetMap.values()];
+}
+
+const MEMORY_PRODUCTS = buildMemoryCatalog();
+
+function filterProducts(query) {
+  let list = [...MEMORY_PRODUCTS];
+  const { category, minPrice, maxPrice, size } = query;
+  if (category) list = list.filter((p) => p.category === category);
+  if (size) list = list.filter((p) => Array.isArray(p.sizes) && p.sizes.includes(size));
+  if (minPrice || maxPrice) {
+    list = list.filter((p) => {
+      if (minPrice && p.price < Number(minPrice)) return false;
+      if (maxPrice && p.price > Number(maxPrice)) return false;
+      return true;
+    });
+  }
+  return list.sort((a, b) => b.createdAt - a.createdAt);
+}
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", message: "Young Wears API is running." });
-});
-
-app.post("/api/auth/register", async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email, and password are required." });
-    }
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) {
-      if (existing.authProvider === "google") {
-        return res.status(409).json({ message: "This email is already registered with Google. Use Google sign-in." });
-      }
-      return res.status(409).json({ message: "Email already in use." });
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email: normalizedEmail, password: hashed, authProvider: "password" });
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
-
-    return res.status(201).json({
-      token,
-      user: sanitizeUser(user),
-    });
-  } catch (error) {
-    return res.status(500).json({ message: "Registration failed." });
-  }
-});
-
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.status(401).json({ message: "Invalid credentials." });
-
-    if (user.authProvider === "google") {
-      return res.status(400).json({ message: "This account uses Google sign-in. Use Continue with Google." });
-    }
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Invalid credentials." });
-
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
-    return res.json({
-      token,
-      user: sanitizeUser(user),
-    });
-  } catch (error) {
-    return res.status(500).json({ message: "Login failed." });
-  }
-});
-
-app.post("/api/auth/google/supabase", async (req, res) => {
-  try {
-    const { accessToken, email, name, avatarUrl, providerUserId } = req.body || {};
-    if (!accessToken || !email) {
-      return res.status(400).json({ message: "accessToken and email are required." });
-    }
-
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabasePublicKey =
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabasePublicKey) {
-      return res.status(500).json({ message: "Supabase auth environment variables are missing." });
-    }
-
-    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        apikey: supabasePublicKey,
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!userResponse.ok) {
-      return res.status(401).json({ message: "Invalid Supabase access token." });
-    }
-
-    const verifiedUser = await userResponse.json();
-    const verifiedEmail = String(verifiedUser?.email || "").toLowerCase();
-    if (!verifiedEmail || verifiedEmail !== String(email).toLowerCase()) {
-      return res.status(401).json({ message: "Google account verification mismatch." });
-    }
-
-    let user = await User.findOne({ email: verifiedEmail });
-    if (!user) {
-      const generatedPassword = await bcrypt.hash(`google_${providerUserId || verifiedUser.id}_${Date.now()}`, 10);
-      user = await User.create({
-        name: name || verifiedUser.user_metadata?.full_name || verifiedEmail.split("@")[0],
-        email: verifiedEmail,
-        password: generatedPassword,
-        authProvider: "google",
-        oauthProviderId: providerUserId || verifiedUser.id || "",
-        profilePicture: avatarUrl || verifiedUser.user_metadata?.avatar_url || "",
-      });
-    } else {
-      const updates = {};
-      if (name && user.name !== name) updates.name = name;
-      if (avatarUrl && user.profilePicture !== avatarUrl) updates.profilePicture = avatarUrl;
-      if (!user.oauthProviderId && (providerUserId || verifiedUser.id)) {
-        updates.oauthProviderId = providerUserId || verifiedUser.id;
-      }
-      if (Object.keys(updates).length) {
-        user = await User.findByIdAndUpdate(user._id, updates, { new: true });
-      }
-    }
-
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
-    return res.json({ token, user: sanitizeUser(user) });
-  } catch (_error) {
-    return res.status(500).json({ message: "Google login failed." });
-  }
-});
-
-app.get("/api/profile", authMiddleware, async (req, res) => {
-  const user = await User.findById(req.userId).select("-password");
-  if (!user) return res.status(404).json({ message: "User not found." });
-  return res.json(user);
-});
-
-app.put("/api/profile", authMiddleware, async (req, res) => {
-  const allowed = ["name", "email", "phone", "address", "profilePicture"];
-  const updates = {};
-  allowed.forEach((field) => {
-    if (typeof req.body[field] !== "undefined") updates[field] = req.body[field];
+  res.json({
+    status: "ok",
+    message: "Young Wears API is running.",
+    catalogSize: MEMORY_PRODUCTS.length,
   });
-
-  const user = await User.findByIdAndUpdate(req.userId, updates, { new: true }).select("-password");
-  if (!user) return res.status(404).json({ message: "User not found." });
-  return res.json(user);
 });
 
-app.delete("/api/profile", authMiddleware, async (req, res) => {
-  await User.findByIdAndDelete(req.userId);
-  return res.json({ message: "Account deleted." });
-});
-
-app.get("/api/products", async (req, res) => {
-  const { category, minPrice, maxPrice, size } = req.query;
-  const filter = {};
-  if (category) filter.category = category;
-  if (size) filter.sizes = size;
-  if (minPrice || maxPrice) {
-    filter.price = {};
-    if (minPrice) filter.price.$gte = Number(minPrice);
-    if (maxPrice) filter.price.$lte = Number(maxPrice);
-  }
-
-  const products = await Product.find(filter).sort({ createdAt: -1 });
+app.get("/api/products", (req, res) => {
+  const products = filterProducts(req.query);
   return res.json(products);
 });
 
-app.get("/api/products/:id", async (req, res) => {
-  const product = await Product.findById(req.params.id);
+app.get("/api/products/:id", (req, res) => {
+  const product = MEMORY_PRODUCTS.find((p) => String(p._id) === String(req.params.id));
   if (!product) return res.status(404).json({ message: "Product not found." });
   return res.json(product);
 });
 
-async function bootstrap() {
-  try {
-    await mongoose.connect(MONGODB_URI);
-    const count = await Product.countDocuments();
-    if (count === 0) {
-      await Product.insertMany(sampleProducts);
-      console.log(`Sample products seeded: ${sampleProducts.length}`);
-    }
-    for (const doc of facetShowcaseProducts) {
-      await Product.updateOne({ externalId: doc.externalId }, { $set: doc }, { upsert: true });
-    }
-    console.log(`Facet filter showcase synced: ${facetShowcaseProducts.length} products (all sidebar options covered).`);
-    for (const doc of productTypeGridProducts) {
-      await Product.updateOne({ externalId: doc.externalId }, { $set: doc }, { upsert: true });
-    }
-    console.log(
-      `Product type grid synced: ${productTypeGridProducts.length} products (${PRODUCTS_PER_PRODUCT_TYPE} × ${SHOP_PRODUCT_TYPES_GRID.length} types).`
-    );
-    app.listen(PORT, () => {
-      console.log(`Young Wears API running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("Database connection failed:", error.message);
-    process.exit(1);
-  }
-}
-
-bootstrap();
+app.listen(PORT, () => {
+  console.log(`Young Wears API on port ${PORT} — in-memory catalog (${MEMORY_PRODUCTS.length} products). Auth is handled by Supabase on the frontend.`);
+});

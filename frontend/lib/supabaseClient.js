@@ -4,6 +4,18 @@ import { createClient } from "@supabase/supabase-js";
 
 let cachedBrowserClient;
 
+/** Stable browser auth behaviour for password + OAuth (PKCE) callbacks. */
+function createBrowserSupabaseClient(url, key) {
+  return createClient(url, key, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
+}
+
 function readPublicEnv(name) {
   const value = process.env[name];
   return typeof value === "string" ? value.trim() : "";
@@ -32,7 +44,7 @@ export async function getSupabaseBrowserClient() {
     readPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
   if (urlInline && keyInline) {
-    cachedBrowserClient = createClient(urlInline, keyInline);
+    cachedBrowserClient = createBrowserSupabaseClient(urlInline, keyInline);
     return cachedBrowserClient;
   }
 
@@ -51,6 +63,6 @@ export async function getSupabaseBrowserClient() {
     throw new Error("Invalid Supabase configuration returned from server.");
   }
 
-  cachedBrowserClient = createClient(url, key);
+  cachedBrowserClient = createBrowserSupabaseClient(url, key);
   return cachedBrowserClient;
 }

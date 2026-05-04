@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import { sampleProducts } from "@/lib/sampleProducts";
 import { categoryBySlug } from "@/lib/categories";
+import { getServerApiBaseUrl } from "@/lib/serverApiBase";
 
 export function generateStaticParams() {
   return Object.keys(categoryBySlug).map((slug) => ({ slug }));
 }
 
 async function getCategoryProducts(categoryTitle) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  const baseUrl = getServerApiBaseUrl();
   try {
     const response = await fetch(
       `${baseUrl}/products?category=${encodeURIComponent(categoryTitle)}`,

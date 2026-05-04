@@ -7,8 +7,11 @@ function trim(value) {
 }
 
 export async function GET() {
+  const ref = trim(process.env.NEXT_PUBLIC_SUPABASE_PROJECT_REF);
   const url =
-    trim(process.env.NEXT_PUBLIC_SUPABASE_URL) || trim(process.env.SUPABASE_URL);
+    trim(process.env.NEXT_PUBLIC_SUPABASE_URL) ||
+    trim(process.env.SUPABASE_URL) ||
+    (ref ? `https://${ref}.supabase.co` : "");
   const key =
     trim(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ||
     trim(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||

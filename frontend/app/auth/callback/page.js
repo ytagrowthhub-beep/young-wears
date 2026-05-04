@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { getSiteUrl, getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const { completeSocialLogin } = useAuth();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -17,33 +15,34 @@ export default function AuthCallbackPage() {
       try {
         const supabase = await getSupabaseBrowserClient();
         const params = new URLSearchParams(window.location.search);
+        const oauthFail =
+          params.get("error_description") ||
+          params.get("error_code") ||
+          params.get("error");
+        if (oauthFail) {
+          const decoded = decodeURIComponent(String(oauthFail).replace(/\+/g, " "));
+          throw new Error(decoded);
+        }
+
         const code = params.get("code");
         if (code) {
           const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
           if (codeError) throw codeError;
         }
 
-        const { data, error: sessionError } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        const session = data?.session;
-        const user = session?.user;
 
-        if (!session?.access_token || !user?.email) {
+        if (!session?.user?.email) {
           throw new Error("No OAuth session was returned. Please try Google sign-in again.");
         }
 
-        await completeSocialLogin({
-          accessToken: session.access_token,
-          email: user.email,
-          name: user.user_metadata?.full_name || user.user_metadata?.name || user.email.split("@")[0],
-          avatarUrl: user.user_metadata?.avatar_url || "",
-          providerUserId: user.id,
-        });
-
-        await supabase.auth.signOut();
         if (active) router.replace("/profile");
       } catch (err) {
-        const msg = String(err?.response?.data?.message || err?.message || "");
+        const msg = String(err?.message || "");
         if (active) {
           if (msg.toLowerCase().includes("provider is not enabled")) {
             setError("Google provider is disabled in Supabase Auth settings.");
@@ -58,7 +57,7 @@ export default function AuthCallbackPage() {
     return () => {
       active = false;
     };
-  }, [completeSocialLogin, router]);
+  }, [router]);
 
   return (
     <div className="mx-auto max-w-md px-6 py-16 text-center">
@@ -70,7 +69,11 @@ export default function AuthCallbackPage() {
       )}
       {!error && (
         <p className="mt-4 text-xs text-slate-500">
-          If you are not redirected, return to <a className="text-[#0A1F44] underline" href={`${getSiteUrl()}/login`}>login</a>.
+          If you are not redirected, return to{" "}
+          <a className="text-[#0A1F44] underline" href={`${getSiteUrl()}/login`}>
+            login
+          </a>
+          .
         </p>
       )}
     </div>

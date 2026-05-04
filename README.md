@@ -4,36 +4,26 @@ Modern full-stack fashion e-commerce app for **Young Wears**.
 
 ## Stack
 - Frontend: Next.js 16 + Tailwind CSS
-- Backend: Node.js + Express
-- Database: MongoDB
-- Auth: JWT
+- Backend: Node.js + Express (in-memory product catalog; no database)
+- Auth & profiles: **Supabase Auth** (email/password + Google)
 
 ## Project Structure
-- `frontend/` - customer-facing storefront and user dashboard
-- `backend/` - API, authentication, profile CRUD, product data
+- `frontend/` - storefront, Supabase auth, profile UI
+- `backend/` - REST API for **products** only (`/api/products`, `/api/health`)
 
 ## Run Locally
-1. Backend:
-   - Copy `backend/.env.example` to `backend/.env`
-   - Set `MONGODB_URI` and `JWT_SECRET`
-   - Run:
-     - `cd backend`
-     - `npm install`
-     - `npm run dev`
-2. Frontend:
-   - Create `frontend/.env.local` with:
-     - `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
-   - Run:
-     - `cd frontend`
-     - `npm install`
-     - `npm run dev`
+1. **Supabase:** Create a project, set URL + publishable (or anon) key in `frontend/.env.local`. Enable Email auth and (optional) Google. Add redirect URL `http://localhost:3000/auth/callback`.
+2. **Backend (catalog API):**
+   - `cd backend && npm install && npm run dev` (default port 5000)
+3. **Frontend:**
+   - Copy `frontend/.env.example` to `frontend/.env.local` and fill Supabase vars + `BACKEND_URL=http://127.0.0.1:5000` (or set `NEXT_PUBLIC_API_URL=http://localhost:5000/api`).
+   - `cd frontend && npm install && npm run dev`
+4. From repo root, **`npm run dev:all`** starts API + web together.
+
+Optional: add **`SUPABASE_SERVICE_ROLE_KEY`** to `frontend/.env.local` so **Delete account** works (server route uses it once per delete).
 
 ## Features
-- Premium homepage with hero, categories, best sellers, testimonials, and newsletter CTA
-- Sticky navbar with logo, nav, cart, and profile icon
-- Shop page with category/price/size filters
-- Product details with size selection and add-to-cart
-- Cart with quantity updates, removal, persistent local storage, and checkout UI
-- JWT auth: register/login/logout
-- Profile dashboard with full CRUD (view/edit/delete account)
-- Seeded sample products for kids and adults
+- Premium homepage, shop filters, product details, cart (local storage)
+- Sign up / sign in / sign out via **Supabase**
+- Profile edits stored in **Supabase** `user_metadata`
+- Seeded in-memory products (no MongoDB)

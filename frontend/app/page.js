@@ -3,14 +3,18 @@ import Image from "next/image";
 import ProductCard from "@/components/ProductCard";
 import { sampleProducts } from "@/lib/sampleProducts";
 import DigitalProductCountdown from "@/components/DigitalProductCountdown";
+import HomeSpotlight from "@/components/HomeSpotlight";
 import HomeHero from "@/components/HomeHero";
 import HomeProductCarousel from "@/components/HomeProductCarousel";
 import HomePersonalizedSections from "@/components/HomePersonalizedSections";
 import { categoryDisplayOrder, categoryMeta } from "@/lib/categories";
+import { getServerApiBaseUrl } from "@/lib/serverApiBase";
+
+export const dynamic = "force-dynamic";
 
 async function getProducts() {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/products`, {
+    const res = await fetch(`${getServerApiBaseUrl()}/products`, {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("Failed to fetch");
@@ -71,48 +75,7 @@ export default async function Home() {
 
       <HomeProductCarousel products={products} />
 
-      {spotlight && (
-        <section className="mx-auto max-w-7xl px-6 pb-14">
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#FF7A00]">Single Product Spotlight</p>
-            <div className="mt-3 grid gap-6 md:grid-cols-[1.15fr_1fr]">
-              <div>
-                <h2 className="text-3xl font-bold text-[#0A1F44]">{spotlight.name}</h2>
-                <p className="mt-3 text-slate-600">{spotlight.description}</p>
-                <p className="mt-4 text-2xl font-bold text-[#0A1F44]">${spotlight.price.toFixed(2)}</p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Link href={`/product/${spotlight._id}`} className="rounded-lg bg-[#0A1F44] px-5 py-3 text-sm font-semibold text-white">
-                    View Product
-                  </Link>
-                  <Link href="/shop" className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-[#0A1F44]">
-                    Continue Shopping
-                  </Link>
-                </div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-5">
-                <div className="relative mb-4 h-56 overflow-hidden rounded-xl">
-                  <Image
-                    src={spotlight.image}
-                    alt={spotlight.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 40vw"
-                  />
-                </div>
-                <h3 className="text-lg font-semibold text-[#0A1F44]">Why this product?</h3>
-                <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                  <li>- Popular fit and easy styling for daily wear</li>
-                  <li>- Best value in current weekly deal</li>
-                  <li>- Available in multiple sizes for family matching</li>
-                </ul>
-                <div className="mt-5 max-w-xs">
-                  <DigitalProductCountdown durationHours={26} label="Spotlight price ends" size="sm" variant="light" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      <HomeSpotlight spotlight={spotlight} />
 
       <section className="mx-auto max-w-7xl px-6 pb-14">
         <h2 className="text-2xl font-bold text-[#0A1F44]">Editor&apos;s Picks</h2>
